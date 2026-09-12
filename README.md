@@ -1,13 +1,15 @@
 ## CS3244-DeepWeeds
 
 # Run these commands on your local machine:
+```bash
 cd ~/Documents
-git clone https://github.com/<A1-username>/CS3244-DeepWeeds.git
+git clone https://github.com/<your-username>/CS3244-DeepWeeds.git
 cd CS3244-DeepWeeds
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 mkdir -p data outputs figures
+```
 
 
 # Best Practices
