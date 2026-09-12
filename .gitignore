@@ -1,0 +1,13 @@
+data/
+outputs/
+figures/
+*.npy
+*.npz
+*.zip
+*.hdf5
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
