@@ -13,6 +13,7 @@ mkdir -p data outputs figures
 
 
 # Best Practices
+```bash
 git pull
 git checkout -b <branch>     # create and switch to a branch
 
@@ -31,3 +32,4 @@ Then get back to main:
 git checkout main
 git pull
 git branch -d <branch>    # deletes branch
+```
