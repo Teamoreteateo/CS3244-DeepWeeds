@@ -1,6 +1,6 @@
-## CS3244-DeepWeeds
+# CS3244-DeepWeeds
 
-# Run these commands on your local machine:
+## Run these commands on your local machine:
 ```bash
 cd ~/Documents
 git clone https://github.com/<your-username>/CS3244-DeepWeeds.git
@@ -11,8 +11,7 @@ pip install -r requirements.txt
 mkdir -p data outputs figures
 ```
 
-
-# Best Practices
+## Best Practices
 ```bash
 git pull
 git checkout -b <branch>     # create and switch to a branch
@@ -32,4 +31,14 @@ Then get back to main:
 git checkout main
 git pull
 git branch -d <branch>    # deletes branch
+```
+
+## Daily Workflow
+```bash
+git pull                     # ALWAYS before starting
+source .venv/bin/activate
+# ... work ...
+git add src/newfile.py notebooks/03_thing.ipynb
+git commit -m "Short description"
+git push
 ```
