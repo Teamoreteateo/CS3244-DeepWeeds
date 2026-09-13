@@ -1,6 +1,6 @@
 # CS3244-DeepWeeds
 
-## Run these commands on your local machine:
+## Cloning the repository to your local machine:
 ```bash
 cd ~/Documents
 git clone https://github.com/<your-username>/CS3244-DeepWeeds.git
