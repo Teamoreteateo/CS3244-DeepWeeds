@@ -38,7 +38,7 @@ git branch -d <branch>    # deletes branch
 git pull                     # ALWAYS before starting
 source .venv/bin/activate
 # ... work ...
-git add src/newfile.py notebooks/03_thing.ipynb
+git add <file>
 git commit -m "Short description"
 git push
 ```
