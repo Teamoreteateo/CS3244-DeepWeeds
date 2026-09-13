@@ -4,10 +4,13 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     f1_score, accuracy_score, confusion_matrix, classification_report)
+from pathlib import Path
 
 LABELS = list(range(9))
 NEGATIVE = 8          # verified against labels.csv
-
+SPECIES = ["Chinee apple", "Lantana", "Parkinsonia", "Parthenium",
+           "Prickly acacia", "Rubber vine", "Siam weed", "Snake weed",
+           "Negative"]
 
 def evaluate(y_true, y_pred):
     cm = confusion_matrix(y_true, y_pred, labels=LABELS)
@@ -34,7 +37,11 @@ def summarise(fold_results):
                 float(np.std([r[k] for r in fold_results]))) for k in keys}
 
 
-def log_result(model, scheme, params, summary, path="results.csv"):
+RESULTS = Path(__file__).resolve().parent.parent / "results.csv"
+
+
+def log_result(model, scheme, params, summary, path=None):
+    path = RESULTS if path is None else path
     row = {"timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
            "model": model, "split_scheme": scheme,
            "params": json.dumps(params), "seed": 42}
