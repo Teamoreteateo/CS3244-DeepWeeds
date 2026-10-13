@@ -19,6 +19,11 @@ try:
 except ImportError:  # supports `sys.path.insert(0, '../src'); from data_pipeline import ...`
     from data import IMG_DIR, load_folds
 
+try:
+    from .metrics import SPECIES
+except ImportError:
+    from metrics import SPECIES
+
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
 
@@ -70,7 +75,7 @@ class DeepWeedsDataset(Dataset):
             image = img.convert('RGB')
         if self.transform is not None:
             image = self.transform(image)
-        return image, self.class_to_idx[row['Species']]
+        return image, int(row['Label'])
 
 
 def get_dataloaders(
@@ -103,13 +108,16 @@ def get_dataloaders(
         raise ValueError('batch_size must be >= 1')
 
     df = load_folds()
-    required = {'Filename', 'Species', 'is_test', 'session', 'fold_random', 'fold_grouped'}
+    required = {'Filename', 'Label', 'Species', 'is_test', 'session', 'fold_random', 'fold_grouped'}
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f'Missing split metadata columns: {sorted(missing)}')
-    classes = sorted(df['Species'].unique().tolist())
+    classes = (df[['Label', 'Species']].drop_duplicates()
+             .sort_values('Label')['Species'].tolist())
     if len(classes) != 9:
         raise ValueError(f'Expected 9 DeepWeeds classes; found {len(classes)}')
+    if classes != SPECIES:
+        raise ValueError(f'class order mismatch:\n{classes}\n{SPECIES}')
     non_test = df.loc[~df['is_test']].copy()
     test_df = df.loc[df['is_test']].copy()
     fold_column = f'fold_{split}'
