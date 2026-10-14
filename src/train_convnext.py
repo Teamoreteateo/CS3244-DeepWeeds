@@ -14,50 +14,50 @@ from torchvision import transforms
 from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 
 from data import load_folds, ROOT, IMG_DIR
+from data_pipeline import DeepWeedsDataset, make_transforms
 from metrics import evaluate, summarise, log_result, SPECIES
 
 
 # daatset
-class DeepWeedsDataset(Dataset):
-    def __init__(self, df: pd.DataFrame, transform=None):
-        self.df = df.reset_index(drop=True)
-        self.transform = transform
-        self.filenames = self.df["Filename"].values
-        self.labels = self.df["Label"].values
+# class DeepWeedsDataset(Dataset):
+#     def __init__(self, df: pd.DataFrame, transform=None):
+#         self.df = df.reset_index(drop=True)
+#         self.transform = transform
+#         self.filenames = self.df["Filename"].values
+#         self.labels = self.df["Label"].values
 
-    def __len__(self):
-        return len(self.df)
+#     def __len__(self):
+#         return len(self.df)
 
-    def __getitem__(self, idx):
-        path = IMG_DIR / self.filenames[idx]
-        image = Image.open(path).convert("RGB")
-        label = self.labels[idx]
-        if self.transform:
-            image = self.transform(image)
-        return image, label, self.filenames[idx]
+#     def __getitem__(self, idx):
+#         path = IMG_DIR / self.filenames[idx]
+#         image = Image.open(path).convert("RGB")
+#         label = self.labels[idx]
+#         if self.transform:
+#             image = self.transform(image)
+#         return image, label, self.filenames[idx]
 
-
-# transform
-def get_transforms():
-    train_tf = transforms.Compose([
-        transforms.Resize(256), # shorter edge 256 px
-        transforms.RandomResizedCrop(224, scale=(0.8, 1.0)), # take a random crop 224 by 224
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.RandomRotation(degrees=30),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2), # "to address severe field illumination and orientation shifts" from proposal
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]), # for convnext
-    ])
-    val_tf = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224), # no augmentation for val data
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]),
-    ])
-    return train_tf, val_tf
+# # transform
+# def get_transforms():
+#     train_tf = transforms.Compose([
+#         transforms.Resize(256), # shorter edge 256 px
+#         transforms.RandomResizedCrop(224, scale=(0.8, 1.0)), # take a random crop 224 by 224
+#         transforms.RandomHorizontalFlip(),
+#         transforms.RandomVerticalFlip(),
+#         transforms.RandomRotation(degrees=30),
+#         transforms.ColorJitter(brightness=0.2, contrast=0.2), # "to address severe field illumination and orientation shifts" from proposal
+#         transforms.ToTensor(),
+#         transforms.Normalize(mean=[0.485, 0.456, 0.406],
+#                              std=[0.229, 0.224, 0.225]), # for convnext
+#     ])
+#     val_tf = transforms.Compose([
+#         transforms.Resize(256),
+#         transforms.CenterCrop(224), # no augmentation for val data
+#         transforms.ToTensor(),
+#         transforms.Normalize(mean=[0.485, 0.456, 0.406],
+#                              std=[0.229, 0.224, 0.225]),
+#     ])
+#     return train_tf, val_tf
 
 
 # model
@@ -79,7 +79,7 @@ def build_convnext_tiny(num_classes=9, freeze_backbone=True):
 def train_one_epoch(model, loader, criterion, optimizer, device):
     model.train()
     total_loss = 0.0
-    for images, labels, _ in loader:
+    for images, labels in loader:
         images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(images)
@@ -93,17 +93,16 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
 @torch.no_grad()
 def evaluate_model(model, loader, device):
     model.eval()
-    all_preds, all_trues, all_files = [], [], []
-    for images, labels, filenames in loader:
+    all_preds, all_trues = [], []
+    for images, labels in loader:
         images = images.to(device)
         outputs = model(images)
         preds = torch.argmax(outputs, dim=1).cpu().numpy()
         all_preds.extend(preds)
         all_trues.extend(labels.numpy())
-        all_files.extend(filenames)
 
     metrics = evaluate(all_trues, all_preds)
-    return metrics, np.array(all_preds), np.array(all_trues), np.array(all_files)
+    return metrics, np.array(all_preds), np.array(all_trues)
 
 
 # exc
@@ -129,9 +128,11 @@ def main():
     va_df = pool[pool[col] == args.fold]
     print(f"Scheme: {args.scheme} | Fold: {args.fold} | Train: {len(tr_df)} | Val: {len(va_df)}")
 
-    train_tf, val_tf = get_transforms()
-    tr_loader = DataLoader(DeepWeedsDataset(tr_df, train_tf), batch_size=args.batch_size, shuffle=True, num_workers=2)
-    va_loader = DataLoader(DeepWeedsDataset(va_df, val_tf), batch_size=args.batch_size, shuffle=False, num_workers=2)
+    tr_ds = DeepWeedsDataset(tr_df, IMG_DIR, make_transforms(True), SPECIES)
+    va_ds = DeepWeedsDataset(va_df, IMG_DIR, make_transforms(False), SPECIES)
+
+    tr_loader = DataLoader(tr_ds, batch_size=args.batch_size, shuffle=True, num_workers=2)
+    va_loader = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
     # class-imbalance ablation support
     if args.weighted_loss:
@@ -150,10 +151,11 @@ def main():
     best_macro_f1 = 0.0
     best_results = None
     misclassifications = None
+    val_files = va_df["Filename"].values             # Extract filenames in order
 
     for epoch in range(1, args.epochs + 1):
         loss = train_one_epoch(model, tr_loader, criterion, optimizer, device)
-        val_metrics, preds, trues, files = evaluate_model(model, va_loader, device)
+        val_metrics, preds, trues = evaluate_model(model, va_loader, device)
 
         print(f"Epoch {epoch:02d}/{args.epochs:02d} | Loss: {loss:.4f} | "
               f"Macro F1: {val_metrics['macro_f1']:.4f} | Acc: {val_metrics['accuracy']:.4f}")
@@ -165,7 +167,7 @@ def main():
             # extract misclassified instances
             wrong_mask = preds != trues
             misclassifications = pd.DataFrame({
-                "Filename": files[wrong_mask],
+                "Filename": val_files[wrong_mask],   # Pair with validation filenames
                 "True_Label": trues[wrong_mask],
                 "Pred_Label": preds[wrong_mask],
                 "True_Species": [SPECIES[l] for l in trues[wrong_mask]],
