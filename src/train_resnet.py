@@ -22,7 +22,7 @@ import torch
 from PIL import Image
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
-from torchvision.models import ResNet50_Weights, resnet50
+from torchvision.models import (ResNet18_Weights, ResNet50_Weights, resnet18, resnet50)
 from torchvision import transforms
 
 from data import IMG_DIR, ROOT, load_folds
@@ -78,8 +78,10 @@ def make_transforms(train: bool) -> transforms.Compose:
     ])
 
 
-def build_model(mode: str, device: torch.device) -> nn.Module:
-    model = resnet50(weights=ResNet50_Weights.DEFAULT)
+def build_model(mode: str, device: torch.device, arch: str = "resnet50") -> nn.Module:
+    weights = None if mode == "scratch" else (
+        ResNet18_Weights.DEFAULT if arch == "resnet18" else ResNet50_Weights.DEFAULT)
+    model = resnet18(weights=weights) if arch == "resnet18" else resnet50(weights=weights)
     model.fc = nn.Linear(model.fc.in_features, NUM_CLASSES)
     if mode == "frozen":
         for parameter in model.parameters():
@@ -174,7 +176,7 @@ def train_fold(
     train_loader, validation_loader, test_loader = make_loaders(
         train_df, validation_df, test_df, args.batch_size, args.workers
     )
-    model = build_model(mode, device)
+    model = build_model(mode, device, args.arch)
     criterion = make_criterion(train_df, args.weighted_loss, device)
     parameters = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(parameters, lr=args.lr, weight_decay=args.weight_decay)
@@ -199,12 +201,15 @@ def train_fold(
     if best_state is None or best_validation is None:
         raise RuntimeError("No model checkpoint was produced.")
     model.load_state_dict(best_state)
-    test_true, test_predicted, _ = predict(model, test_loader, device)
-    test_metrics = evaluate(test_true, test_predicted)
+    if args.eval_test:
+        test_true, test_predicted, _ = predict(model, test_loader, device)
+        test_metrics = evaluate(test_true, test_predicted)
+    else:
+        test_metrics = None
 
     checkpoint_dir = ROOT / "outputs" / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = checkpoint_dir / f"resnet50_{mode}_{args.scheme}_fold{fold}.pt"
+    checkpoint_path = checkpoint_dir / f"{args.arch}_{mode}_{args.scheme}_fold{fold}.pt"
     torch.save(
         {
             "mode": mode,
@@ -216,17 +221,19 @@ def train_fold(
         },
         checkpoint_path,
     )
-    print(
-        f"fold={fold} best_val_macro_f1={best_validation['macro_f1']:.4f} "
-        f"test_accuracy={test_metrics['accuracy']:.4f} "
-        f"checkpoint={checkpoint_path}"
-    )
+    msg = f"fold={fold} best_val_macro_f1={best_validation['macro_f1']:.4f}"
+    if test_metrics is not None:
+        msg += f" test_accuracy={test_metrics['accuracy']:.4f}"
+    print(msg + f" checkpoint={checkpoint_path}")
     return best_validation, test_metrics
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=("frozen", "finetune"), required=True)
+    parser.add_argument("--mode", choices=("frozen", "finetune", "scratch"), required=True)
+    parser.add_argument("--arch", choices=("resnet18", "resnet50"), default="resnet50")
+    parser.add_argument("--eval-test", action="store_true",
+                    help="FINAL evaluation only. Leave off during development.")
     parser.add_argument("--scheme", choices=("random", "grouped"), default="grouped")
     parser.add_argument("--fold", type=int, choices=range(N_FOLDS), default=None)
     parser.add_argument("--epochs", type=int, default=10)
@@ -235,7 +242,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--weighted-loss", action="store_true")
     parser.add_argument("--workers", type=int, default=0)
-    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto")
     return parser.parse_args()
 
 
@@ -243,18 +250,23 @@ def main() -> None:
     args = parse_args()
     if args.epochs < 1 or args.batch_size < 1:
         raise ValueError("epochs and batch-size must be positive")
-    args.lr = args.lr or (1e-3 if args.mode == "frozen" else 1e-4)
+    args.lr = args.lr or (1e-3 if args.mode in ("frozen", "scratch") else 1e-4)
     if args.lr <= 0:
         raise ValueError("lr must be positive")
     seed_everything(SEED)
 
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is not available.")
-    device = torch.device(
-        "cuda" if args.device == "cuda" or (
-            args.device == "auto" and torch.cuda.is_available()
-        ) else "cpu"
-    )
+    if args.device == "mps" and not torch.backends.mps.is_available():
+        raise RuntimeError("MPS was requested but is not available.")
+    if args.device != "auto":
+        device = torch.device(args.device)
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     print(f"mode={args.mode} scheme={args.scheme} device={device}")
 
     folds = load_folds()
@@ -271,18 +283,22 @@ def main() -> None:
             args.mode, train_df, validation_df, test_df, args, device, fold
         )
         validation_results.append(validation)
-        test_results.append(test)
+        if test is not None:
+            test_results.append(test)
 
     validation_summary = summarise(validation_results)
-    test_summary = summarise(test_results)
     print("\nValidation summary (mean +/- std):")
     for metric, (mean, std) in validation_summary.items():
         print(f"  {metric}: {mean:.4f} +/- {std:.4f}")
-    print("\nHeld-out test reference (mean +/- std across fold models):")
-    for metric, (mean, std) in test_summary.items():
-        print(f"  {metric}: {mean:.4f} +/- {std:.4f}")
+        
+    if test_results:
+        test_summary = summarise(test_results)
+        print("\nHeld-out test (mean +/- std across fold models):")
+        for metric, (mean, std) in test_summary.items():
+            print(f"  {metric}: {mean:.4f} +/- {std:.4f}")
 
     params = {
+        "arch": args.arch,
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "lr": args.lr,
@@ -290,7 +306,7 @@ def main() -> None:
         "weighted_loss": args.weighted_loss,
         "folds": selected_folds,
     }
-    log_result(f"resnet50_{args.mode}", args.scheme, params, validation_summary)
+    log_result(f"{args.arch}_{args.mode}", args.scheme, params, validation_summary)
     print("\nValidation summary logged to results.csv.")
 
 
