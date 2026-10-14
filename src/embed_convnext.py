@@ -1,7 +1,6 @@
-"""Cache frozen ImageNet ResNet-50 penultimate features (2048-d). Run once."""
 import numpy as np, torch
 from torch.utils.data import DataLoader
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 from tqdm import tqdm
 
 from data import load_folds, IMG_DIR, OUTPUTS
@@ -16,8 +15,8 @@ def main():
                        else "mps" if torch.backends.mps.is_available() else "cpu")
     print("device:", dev)
 
-    m = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
-    m.fc = torch.nn.Identity()
+    m = convnext_tiny(weights=ConvNeXt_Tiny_Weights.IMAGENET1K_V1)
+    m.classifier[2] = torch.nn.Identity()
     m.eval().to(dev)
 
     f = load_folds()
@@ -33,8 +32,8 @@ def main():
     y = np.concatenate(labs)
 
     assert (y == f["Label"].values).all(), "row order drifted"
-    np.save(OUTPUTS / "X_resnet50.npy", X)
-    f["Filename"].to_csv(OUTPUTS / "feature_order_resnet50.csv", index=False)
+    np.save(OUTPUTS / "X_convnext_tiny.npy", X)
+    f["Filename"].to_csv(OUTPUTS / "feature_order_convnext_tiny.csv", index=False)
     print("cached", X.shape)
 
 
