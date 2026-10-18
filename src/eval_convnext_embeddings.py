@@ -8,9 +8,9 @@ from metrics import evaluate, summarise, log_result, SPECIES
 
 
 def run(scheme, balanced=False):
-    X = np.load(OUTPUTS / "X_convnext_tiny.npy")
-    y = np.load(OUTPUTS / "y.npy")
     f = load_folds()
+    X = np.load(OUTPUTS / "X_convnext_tiny.npy")
+    y = f["Label"].values
 
     order = pd.read_csv(OUTPUTS / "feature_order_convnext_tiny.csv")["Filename"].tolist()
     assert order == f["Filename"].tolist(), "row misalignment"
