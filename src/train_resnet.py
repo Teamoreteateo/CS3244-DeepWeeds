@@ -19,14 +19,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from PIL import Image
 from torch import nn
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from torchvision.models import (ResNet18_Weights, ResNet50_Weights, resnet18, resnet50)
-from torchvision import transforms
 
 from data import IMG_DIR, ROOT, load_folds
-from metrics import evaluate, log_result, summarise
+from metrics import evaluate, log_result, summarise, SPECIES
+from data_pipeline import DeepWeedsDataset, make_transforms
 
 SEED = 42
 N_FOLDS = 5
@@ -40,43 +39,6 @@ def seed_everything(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-
-class DeepWeedsDataset(Dataset):
-    def __init__(self, dataframe: pd.DataFrame, transform: transforms.Compose):
-        self.dataframe = dataframe.reset_index(drop=True)
-        self.transform = transform
-
-    def __len__(self) -> int:
-        return len(self.dataframe)
-
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, int, str]:
-        row = self.dataframe.iloc[index]
-        with Image.open(IMG_DIR / row["Filename"]) as image:
-            image = image.convert("RGB")
-        return self.transform(image), int(row["Label"]), str(row["Filename"])
-
-
-def make_transforms(train: bool) -> transforms.Compose:
-    weights = ResNet50_Weights.DEFAULT
-    if train:
-        return transforms.Compose([
-            transforms.Resize(256),
-            transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            transforms.RandomRotation(30),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2),
-            transforms.ToTensor(),
-            transforms.Normalize(weights.transforms().mean, weights.transforms().std),
-        ])
-    return transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(IMAGE_SIZE),
-        transforms.ToTensor(),
-        transforms.Normalize(weights.transforms().mean, weights.transforms().std),
-    ])
-
 
 def build_model(mode: str, device: torch.device, arch: str = "resnet50") -> nn.Module:
     weights = None if mode == "scratch" else (
@@ -92,16 +54,11 @@ def build_model(mode: str, device: torch.device, arch: str = "resnet50") -> nn.M
     return model
 
 
-def make_loaders(
-    train_df: pd.DataFrame,
-    validation_df: pd.DataFrame,
-    test_df: pd.DataFrame,
-    batch_size: int,
-    workers: int,
-) -> tuple[DataLoader, DataLoader, DataLoader]:
-    train = DeepWeedsDataset(train_df, make_transforms(train=True))
-    validation = DeepWeedsDataset(validation_df, make_transforms(train=False))
-    test = DeepWeedsDataset(test_df, make_transforms(train=False))
+def make_loaders(train_df, validation_df, test_df, batch_size, workers):
+    classes = SPECIES
+    train = DeepWeedsDataset(train_df, IMG_DIR, make_transforms(augment=True), classes)
+    validation = DeepWeedsDataset(validation_df, IMG_DIR, make_transforms(augment=False), classes)
+    test = DeepWeedsDataset(test_df, IMG_DIR, make_transforms(augment=False), classes)
     return (
         DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=workers),
         DataLoader(validation, batch_size=batch_size, shuffle=False, num_workers=workers),
