@@ -177,7 +177,11 @@ def main():
     # save summary & misclassifications
     summary = {k: (float(best_results[k]), 0.0) for k in ["macro_f1", "weighted_f1", "accuracy", "weed_to_negative_rate"]}
     model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}"
-    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs}
+
+    # TUNED: run 2
+    base = 'weighted' if args.weighted_loss else 'ce'
+    model_tag = f"convnext_tiny_{base}_tuned_2"
+    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs, "scheduler": "cosine", "weights": "sqrt_damped" if args.weighted_loss else "none"}
     log_result(model_tag, args.scheme, params, summary)
 
     out_dir = ROOT / "outputs"
