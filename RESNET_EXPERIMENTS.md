@@ -115,8 +115,6 @@ grouped/random gap.
 
 ## Interpretation
 
-## Interpretation
-
 The three modes isolate different contributions. **Scratch** measures what the
 architecture alone achieves on 13k images. **Frozen** measures how well
 ImageNet features transfer without adaptation. **Fine-tuning** measures what
