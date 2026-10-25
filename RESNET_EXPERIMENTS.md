@@ -2,21 +2,14 @@
 
 ## What was done
 
-The project now supports two transfer-learning experiments on the DeepWeeds
-dataset:
+The project supports three experiments on the DeepWeeds dataset:
 
-1. **Frozen pretrained features**
-   - Loads an ImageNet-pretrained ResNet-50.
-   - Replaces the original 1,000-class ImageNet head with a 9-class DeepWeeds
-     classifier.
-   - Freezes the ResNet-50 backbone.
-   - Trains only the new final linear layer on the DeepWeeds training images.
-   - Keeps the backbone's BatchNorm running statistics fixed.
-
-2. **End-to-end fine-tuning**
-   - Starts with the same ImageNet-pretrained ResNet-50.
-   - Replaces the final layer with a 9-class classifier.
-   - Updates all ResNet-50 weights using the DeepWeeds training data.
+1. **Frozen pretrained features** — ImageNet-pretrained backbone frozen,
+   only the new 9-class head trained; backbone BatchNorm statistics fixed.
+2. **End-to-end fine-tuning** — all weights updated from ImageNet init.
+3. **From scratch** (`--mode scratch`) — random initialisation, no ImageNet
+   weights. Run as a pretraining ablation, not a candidate model.
+   Use `--arch resnet18` here; ResNet-50 from random init overfits 13k images.
 
 The implementation is in [`src/train_resnet.py`](src/train_resnet.py).
 PyTorch and torchvision were added to [`requirements.txt`](requirements.txt).
@@ -40,9 +33,10 @@ Validation: the remaining grouped fold
 Test:       the separate held-out test set
 ```
 
-The test set is not used to update model weights or select the best epoch.
-The current script reports test performance for each fold model as a
-reference. The primary model-selection metrics are the validation metrics.
+The held-out test set is evaluated only when `--eval-test` is passed
+(default off), reserved for the single final evaluation once results
+are frozen. 
+The primary model-selection metrics are the validation metrics.
 
 ## Metrics
 
@@ -53,7 +47,7 @@ Each run reports:
 - Weighted F1.
 - Weed-to-negative classification rate.
 - Validation summary across the selected folds.
-- Held-out test reference metrics.
+- Held-out test reference metrics (only with `--eval-test`).
 
 Validation summaries are appended to [`results.csv`](results.csv).
 The best model checkpoint for each fold is saved under:
@@ -64,65 +58,80 @@ outputs/checkpoints/
 
 ## How to run
 
-Run the frozen-feature baseline across all five grouped folds:
+Frozen-feature baseline, all five grouped folds:
 
-```powershell
-python src/train_resnet.py `
-  --mode frozen `
-  --scheme grouped `
-  --epochs 10
+```bash
+python src/train_resnet.py --mode frozen --scheme grouped --epochs 10
 ```
 
-Run end-to-end fine-tuning across all five grouped folds:
+End-to-end fine-tuning, one grouped fold:
 
-```powershell
-python src/train_resnet.py `
-  --mode finetune `
-  --scheme grouped `
-  --epochs 20 `
-  --lr 0.0001
+```bash
+python src/train_resnet.py --mode finetune --arch resnet50 --scheme grouped \
+  --fold 0 --epochs 20 --batch-size 64 --workers 2 --device cuda
 ```
 
-Run a quick one-fold smoke test:
+From-scratch pretraining ablation:
 
-```powershell
-python src/train_resnet.py `
-  --mode frozen `
-  --scheme grouped `
-  --fold 0 `
-  --epochs 1 `
-  --batch-size 64 `
-  --device cpu
+```bash
+python src/train_resnet.py --mode scratch --arch resnet18 --scheme grouped \
+  --fold 0 --epochs 40 --batch-size 64 --workers 2 --device cuda
 ```
 
-Use `--scheme random` to compare against the random stratified folds. Use
-`--weighted-loss` to train with inverse-frequency class weights.
+One-fold smoke test:
 
-## Current compute limitation
-
-The current environment has a CPU-only PyTorch installation:
-
-```text
-torch 2.14.0+cpu
-CUDA available: False
+```bash
+python src/train_resnet.py --mode frozen --scheme grouped --fold 0 \
+  --epochs 1 --batch-size 64 --workers 0 --device cpu
 ```
 
-As a result, a full five-fold ResNet-50 run is slow. The frozen experiment
-currently recomputes the frozen backbone features once per epoch. A future
-optimization would cache those features once and train the linear classifier
-on the cached vectors. End-to-end fine-tuning cannot use this optimization
-because the backbone weights change during training.
+Omit `--fold` to run all five folds. Use `--scheme random` to compare against
+the random stratified folds, and `--weighted-loss` for inverse-frequency class
+weights (off in all reported results).
 
-For practical training times, run the experiments on a CUDA-enabled machine,
-Google Colab, or another GPU environment.
+## Compute
+
+Runs are executed on Google Colab (T4). Local CPU-only installations are
+usable for smoke tests but not for full runs. Colab provides 2 CPUs, so
+use `--workers 2`; higher values trigger a DataLoader warning and can
+bottleneck loading.
+
+## Headline results
+
+| model | folds | grouped | random |
+|---|---|---|---|
+| majority class | 5 | 0.077 | 0.077 |
+| HOG/LBP/HSV + random forest | 5 | 0.357 | — |
+| ResNet-18 from scratch, 40 ep | 1 | 0.555 | — |
+| ResNet-50 frozen + logreg | 5 | 0.604 | 0.774 |
+| ResNet-50 fine-tuned, 20 ep | 1 | 0.804 | 0.947 |
+
+Macro-F1; no weighted loss. Single-fold rows have no error estimate.
+Fine-tuned ResNet-50 on the random split reaches 96.3% accuracy, matching the
+95.7% reported by Olsen et al. under their protocol. A repeat of the grouped
+fine-tune with an identical configuration gave 0.798 vs 0.804 macro-F1,
+indicating run-to-run variation of roughly 0.006 — far smaller than the
+grouped/random gap.
 
 ## Interpretation
 
-The frozen experiment measures how well ImageNet features transfer to
-DeepWeeds without adapting the feature extractor. The fine-tuned experiment
-measures whether adapting the complete ResNet-50 improves performance.
+## Interpretation
 
-The 95.7% accuracy reported by Olsen et al. (2019) should be treated as a
-reference point unless their exact dataset split, preprocessing, augmentation,
-training schedule, and evaluation protocol are reproduced. Our grouped
-session-level split is designed to provide a stricter leakage-safe evaluation.
+The three modes isolate different contributions. **Scratch** measures what the
+architecture alone achieves on 13k images. **Frozen** measures how well
+ImageNet features transfer without adaptation. **Fine-tuning** measures what
+adapting those features to weed imagery adds. The scratch-to-frozen gap
+(0.555 → 0.604 grouped) is attributable to ImageNet pretraining; the
+frozen-to-fine-tuned gap (0.604 → 0.804) to adaptation.
+
+The ~0.15 macro-F1 gap between grouped and random splits persists at both the
+frozen and fine-tuned rungs, so fine-tuning does not overcome the session
+shortcut. Because DeepWeeds was collected continuously in the field, a random
+stratified split places near-duplicate frames from the same session on both
+sides of the partition. Our random-split numbers reproduce the published
+result; our grouped-split numbers are what the model generalises to across
+unseen sessions.
+
+The 95.7% accuracy reported by Olsen et al. (2019) remains a reference point
+rather than a target, since their exact preprocessing, augmentation and
+training schedule differ from ours.
