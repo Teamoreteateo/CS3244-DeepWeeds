@@ -54,8 +54,8 @@ def main() -> None:
             "Run this script in the GPU/Colab environment."
         )
 
-    OUTPUT_DIR.mkdir(exist_ok=True)
-    CHECKPOINT_DIR.mkdir(exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     folds = load_folds()
     test_df = folds.loc[folds["is_test"]].copy()
     pool = folds.loc[~folds["is_test"]].copy()
