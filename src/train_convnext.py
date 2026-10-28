@@ -116,12 +116,6 @@ def main():
     parser.add_argument("--weighted_loss", action="store_true", help="Use class-weighted cross-entropy")
     args = parser.parse_args()
 
-    base = 'weighted' if args.weighted_loss else 'ce'
-    model_tag = f"convnext_tiny_{base}_tuned_2"
-
-    out_dir = ROOT / "outputs"
-    out_dir.mkdir(exist_ok=True)
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -141,38 +135,20 @@ def main():
     va_loader = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
     # class-imbalance ablation support
-    # if args.weighted_loss:
-    #     counts = tr_df["Label"].value_counts().sort_index().values
-    #     weights = len(tr_df) / (9.0 * counts)
-    #     class_weights = torch.tensor(weights, dtype=torch.float).to(device)
-    #     criterion = nn.CrossEntropyLoss(weight=class_weights)
-    #     print("Using Class-Weighted Cross-Entropy Loss")
-    # else:
-    #     criterion = nn.CrossEntropyLoss()
-    #     print("Using Standard Cross-Entropy Loss")
-
     if args.weighted_loss:
         counts = tr_df["Label"].value_counts().sort_index().values
-        weights = np.sqrt(len(tr_df) / (9.0 * counts))
+        weights = len(tr_df) / (9.0 * counts)
         class_weights = torch.tensor(weights, dtype=torch.float).to(device)
         criterion = nn.CrossEntropyLoss(weight=class_weights)
-        print("Using Dampened Class-Weighted Cross-Entropy Loss")
+        print("Using Class-Weighted Cross-Entropy Loss")
     else:
         criterion = nn.CrossEntropyLoss()
         print("Using Standard Cross-Entropy Loss")
 
     model = build_convnext_tiny(num_classes=9).to(device)
-    # Train head faster, adapt backbone gently
-    backbone_params = [p for p in model.features[-1].parameters() if p.requires_grad]
-    head_params = list(model.classifier.parameters())
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-2)
 
-    optimizer = torch.optim.AdamW([
-        {"params": backbone_params, "lr": args.lr * 0.1},  # Backbone adapts gently (e.g., 1e-5)
-        {"params": head_params, "lr": args.lr}             # Head trains at full lr (e.g., 1e-4)
-    ], weight_decay=1e-2)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
-
-    best_macro_f1 = -1.0
+    best_macro_f1 = 0.0
     best_results = None
     misclassifications = None
     val_files = va_df["Filename"].values             # Extract filenames in order
@@ -180,12 +156,9 @@ def main():
     for epoch in range(1, args.epochs + 1):
         loss = train_one_epoch(model, tr_loader, criterion, optimizer, device)
         val_metrics, preds, trues = evaluate_model(model, va_loader, device)
-        scheduler.step()
-        current_lr = scheduler.get_last_lr()[0]
-        print(f"Epoch {epoch:02d}/{args.epochs:02d} | Loss: {loss:.4f} | LR: {current_lr:.2e} | "
+
+        print(f"Epoch {epoch:02d}/{args.epochs:02d} | Loss: {loss:.4f} | "
               f"Macro F1: {val_metrics['macro_f1']:.4f} | Acc: {val_metrics['accuracy']:.4f}")
-        # print(f"Epoch {epoch:02d}/{args.epochs:02d} | Loss: {loss:.4f} | "
-        #       f"Macro F1: {val_metrics['macro_f1']:.4f} | Acc: {val_metrics['accuracy']:.4f}")
 
         if val_metrics["macro_f1"] > best_macro_f1:
             best_macro_f1 = val_metrics["macro_f1"]
@@ -200,18 +173,15 @@ def main():
                 "True_Species": [SPECIES[l] for l in trues[wrong_mask]],
                 "Pred_Species": [SPECIES[l] for l in preds[wrong_mask]]
             })
-            torch.save(model.state_dict(), ROOT / "outputs" / f"{model_tag}_best.pth")
 
     # save summary & misclassifications
     summary = {k: (float(best_results[k]), 0.0) for k in ["macro_f1", "weighted_f1", "accuracy", "weed_to_negative_rate"]}
-    #model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}"
-
-    # TUNED: run 2
-    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs, "scheduler": "cosine", "weights": "sqrt_damped" if args.weighted_loss else "none"}
+    model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}"
+    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs}
     log_result(model_tag, args.scheme, params, summary)
 
-    # out_dir = ROOT / "outputs"
-    # out_dir.mkdir(exist_ok=True)
+    out_dir = ROOT / "outputs"
+    out_dir.mkdir(exist_ok=True)
     misclassifications.to_csv(out_dir / f"misclassifications_{model_tag}_f{args.fold}.csv", index=False)
     print(f"\nresults appended to results.csv, misclassified samples exported to outputs/.")
 
