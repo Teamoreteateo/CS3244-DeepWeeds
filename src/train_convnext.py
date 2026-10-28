@@ -175,10 +175,15 @@ def main():
             })
 
     # save summary & misclassifications
-    summary = {k: (float(best_results[k]), 0.0) for k in ["macro_f1", "weighted_f1", "accuracy", "weed_to_negative_rate"]}
+    KEYS = ["macro_f1", "weighted_f1", "accuracy", "weed_to_negative_rate"]
+    def to_summary(m):
+        return {k: (float(m[k]), 0.0) for k in KEYS}
+
     model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}"
     params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs}
-    log_result(model_tag, args.scheme, params, summary)
+
+    log_result(model_tag + "_best", args.scheme, params, to_summary(best_results))
+    log_result(model_tag + "_final", args.scheme, params, to_summary(val_metrics))
 
     out_dir = ROOT / "outputs"
     out_dir.mkdir(exist_ok=True)
