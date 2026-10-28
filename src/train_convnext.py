@@ -3,6 +3,7 @@ convnext tiny -- training, ablation, evaluation
 """
 import argparse
 import json
+import random
 from pathlib import Path
 from PIL import Image
 import numpy as np
@@ -14,7 +15,7 @@ from torchvision import transforms
 from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 
 from data import load_folds, ROOT, IMG_DIR
-from data_pipeline import DeepWeedsDataset, make_transforms
+from data_pipeline import DeepWeedsDataset, make_transforms, apply_cutmix
 from metrics import evaluate, summarise, log_result, SPECIES
 
 
@@ -76,11 +77,13 @@ def build_convnext_tiny(num_classes=9, freeze_backbone=True):
 
 
 # train, eval
-def train_one_epoch(model, loader, criterion, optimizer, device):
+def train_one_epoch(model, loader, criterion, optimizer, device, use_cutmix = False):
     model.train()
     total_loss = 0.0
     for images, labels in loader:
         images, labels = images.to(device), labels.to(device)
+        if use_cutmix:
+            images, labels = apply_cutmix(images, labels, num_classes=9, probability=0.5)        
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
@@ -107,6 +110,7 @@ def evaluate_model(model, loader, device):
 
 # exc
 def main():
+    random.seed(42); np.random.seed(42); torch.manual_seed(42)
     parser = argparse.ArgumentParser()
     parser.add_argument("--fold", type=int, default=0, help="Fold index (0-4)")
     parser.add_argument("--scheme", type=str, default="grouped", choices=["random", "grouped"])
@@ -114,6 +118,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weighted_loss", action="store_true", help="Use class-weighted cross-entropy")
+    parser.add_argument("--cutmix", action="store_true", help="Apply CutMix to training batches")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -154,7 +159,7 @@ def main():
     val_files = va_df["Filename"].values             # Extract filenames in order
 
     for epoch in range(1, args.epochs + 1):
-        loss = train_one_epoch(model, tr_loader, criterion, optimizer, device)
+        loss = train_one_epoch(model, tr_loader, criterion, optimizer, device, use_cutmix=args.cutmix)
         val_metrics, preds, trues = evaluate_model(model, va_loader, device)
 
         print(f"Epoch {epoch:02d}/{args.epochs:02d} | Loss: {loss:.4f} | "
@@ -179,7 +184,7 @@ def main():
     def to_summary(m):
         return {k: (float(m[k]), 0.0) for k in KEYS}
 
-    model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}"
+    model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}{'_cutmix' if args.cutmix else ''}"
     params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs}
 
     log_result(model_tag + "_best", args.scheme, params, to_summary(best_results))
