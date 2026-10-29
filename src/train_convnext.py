@@ -185,14 +185,14 @@ def main():
         return {k: (float(m[k]), 0.0) for k in KEYS}
 
     model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}{'_cutmix' if args.cutmix else ''}"
-    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs}
+    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs, "seed_set": 42}
 
     log_result(model_tag + "_best", args.scheme, params, to_summary(best_results))
     log_result(model_tag + "_final", args.scheme, params, to_summary(val_metrics))
 
     out_dir = ROOT / "outputs"
     out_dir.mkdir(exist_ok=True)
-    misclassifications.to_csv(out_dir / f"misclassifications_{model_tag}_f{args.fold}.csv", index=False)
+    misclassifications.to_csv(out_dir / f"misclassifications_{model_tag}_{args.scheme}_f{args.fold}.csv", index=False)
     print(f"\nresults appended to results.csv, misclassified samples exported to outputs/.")
 
 

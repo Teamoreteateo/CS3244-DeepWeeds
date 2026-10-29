@@ -1,0 +1,77 @@
+Using device: cuda
+Scheme: grouped | Fold: 0 | Train: 10820 | Val: 2454
+Using Class-Weighted Cross-Entropy Loss
+Downloading: "https://download.pytorch.org/models/convnext_tiny-983f1562.pth" to /root/.cache/torch/hub/checkpoints/convnext_tiny-983f1562.pth
+  0%|          | 0.00/109M [00:00<?, ?B/s]  3%|▎         | 3.12M/109M [00:00<00:03, 32.7MB/s]  6%|▌         | 6.25M/109M [00:00<00:03, 31.2MB/s] 18%|█▊        | 20.1M/109M [00:00<00:01, 81.9MB/s] 30%|███       | 33.1M/109M [00:00<00:00, 102MB/s]  41%|████      | 45.0M/109M [00:00<00:00, 110MB/s] 54%|█████▍    | 59.0M/109M [00:00<00:00, 122MB/s] 67%|██████▋   | 72.6M/109M [00:00<00:00, 129MB/s] 81%|████████  | 87.9M/109M [00:00<00:00, 139MB/s] 94%|█████████▍| 103M/109M [00:00<00:00, 144MB/s] 100%|██████████| 109M/109M [00:00<00:00, 121MB/s]
+Epoch 01/10 | Loss: 0.8813 | Macro F1: 0.5743 | Acc: 0.5958
+Epoch 02/10 | Loss: 0.4298 | Macro F1: 0.6010 | Acc: 0.6699
+Epoch 03/10 | Loss: 0.3262 | Macro F1: 0.6222 | Acc: 0.6618
+Epoch 04/10 | Loss: 0.2735 | Macro F1: 0.6610 | Acc: 0.7205
+Epoch 05/10 | Loss: 0.2332 | Macro F1: 0.6227 | Acc: 0.6638
+Epoch 06/10 | Loss: 0.1960 | Macro F1: 0.6333 | Acc: 0.6923
+Epoch 07/10 | Loss: 0.1757 | Macro F1: 0.6473 | Acc: 0.6968
+Epoch 08/10 | Loss: 0.1604 | Macro F1: 0.6586 | Acc: 0.7388
+Epoch 09/10 | Loss: 0.1433 | Macro F1: 0.7040 | Acc: 0.7852
+Epoch 10/10 | Loss: 0.1315 | Macro F1: 0.6719 | Acc: 0.7249
+
+results appended to results.csv, misclassified samples exported to outputs/.
+Using device: cuda
+Scheme: grouped | Fold: 1 | Train: 10526 | Val: 2748
+Using Class-Weighted Cross-Entropy Loss
+Epoch 01/10 | Loss: 0.9794 | Macro F1: 0.6785 | Acc: 0.6692
+Epoch 02/10 | Loss: 0.5125 | Macro F1: 0.6878 | Acc: 0.6870
+Epoch 03/10 | Loss: 0.3840 | Macro F1: 0.7178 | Acc: 0.7198
+Epoch 04/10 | Loss: 0.3216 | Macro F1: 0.6535 | Acc: 0.6175
+Epoch 05/10 | Loss: 0.2602 | Macro F1: 0.7543 | Acc: 0.7689
+Epoch 06/10 | Loss: 0.2295 | Macro F1: 0.7574 | Acc: 0.7656
+Epoch 07/10 | Loss: 0.1993 | Macro F1: 0.7144 | Acc: 0.7427
+Epoch 08/10 | Loss: 0.1887 | Macro F1: 0.7535 | Acc: 0.7569
+Epoch 09/10 | Loss: 0.1599 | Macro F1: 0.7736 | Acc: 0.7842
+Epoch 10/10 | Loss: 0.1555 | Macro F1: 0.7597 | Acc: 0.7675
+
+results appended to results.csv, misclassified samples exported to outputs/.
+Using device: cuda
+Scheme: grouped | Fold: 2 | Train: 10553 | Val: 2721
+Using Class-Weighted Cross-Entropy Loss
+Epoch 01/10 | Loss: 0.9049 | Macro F1: 0.6115 | Acc: 0.6663
+Epoch 02/10 | Loss: 0.4496 | Macro F1: 0.6407 | Acc: 0.6906
+Epoch 03/10 | Loss: 0.3407 | Macro F1: 0.7065 | Acc: 0.7773
+Epoch 04/10 | Loss: 0.2750 | Macro F1: 0.6728 | Acc: 0.7178
+Epoch 05/10 | Loss: 0.2364 | Macro F1: 0.6807 | Acc: 0.7483
+Epoch 06/10 | Loss: 0.1938 | Macro F1: 0.6976 | Acc: 0.7567
+Epoch 07/10 | Loss: 0.1883 | Macro F1: 0.7267 | Acc: 0.7887
+Epoch 08/10 | Loss: 0.1577 | Macro F1: 0.7192 | Acc: 0.7828
+Epoch 09/10 | Loss: 0.1485 | Macro F1: 0.7242 | Acc: 0.7854
+Epoch 10/10 | Loss: 0.1399 | Macro F1: 0.7071 | Acc: 0.7560
+
+results appended to results.csv, misclassified samples exported to outputs/.
+Using device: cuda
+Scheme: grouped | Fold: 3 | Train: 10557 | Val: 2717
+Using Class-Weighted Cross-Entropy Loss
+Epoch 01/10 | Loss: 0.9634 | Macro F1: 0.6002 | Acc: 0.5948
+Epoch 02/10 | Loss: 0.5045 | Macro F1: 0.6332 | Acc: 0.6507
+Epoch 03/10 | Loss: 0.3726 | Macro F1: 0.6699 | Acc: 0.6780
+Epoch 04/10 | Loss: 0.3178 | Macro F1: 0.6540 | Acc: 0.6437
+Epoch 05/10 | Loss: 0.2688 | Macro F1: 0.6851 | Acc: 0.6886
+Epoch 06/10 | Loss: 0.2293 | Macro F1: 0.6997 | Acc: 0.7100
+Epoch 07/10 | Loss: 0.2063 | Macro F1: 0.6935 | Acc: 0.7011
+Epoch 08/10 | Loss: 0.1826 | Macro F1: 0.7182 | Acc: 0.7317
+Epoch 09/10 | Loss: 0.1653 | Macro F1: 0.7260 | Acc: 0.7361
+Epoch 10/10 | Loss: 0.1405 | Macro F1: 0.7229 | Acc: 0.7398
+
+results appended to results.csv, misclassified samples exported to outputs/.
+Using device: cuda
+Scheme: grouped | Fold: 4 | Train: 10640 | Val: 2634
+Using Class-Weighted Cross-Entropy Loss
+Epoch 01/10 | Loss: 0.9092 | Macro F1: 0.5616 | Acc: 0.6245
+Epoch 02/10 | Loss: 0.4703 | Macro F1: 0.6013 | Acc: 0.6397
+Epoch 03/10 | Loss: 0.3522 | Macro F1: 0.6333 | Acc: 0.7031
+Epoch 04/10 | Loss: 0.3013 | Macro F1: 0.6431 | Acc: 0.7160
+Epoch 05/10 | Loss: 0.2520 | Macro F1: 0.6725 | Acc: 0.7399
+Epoch 06/10 | Loss: 0.2239 | Macro F1: 0.6825 | Acc: 0.7487
+Epoch 07/10 | Loss: 0.1919 | Macro F1: 0.7022 | Acc: 0.7855
+Epoch 08/10 | Loss: 0.1679 | Macro F1: 0.6878 | Acc: 0.7566
+Epoch 09/10 | Loss: 0.1554 | Macro F1: 0.6989 | Acc: 0.7730
+Epoch 10/10 | Loss: 0.1519 | Macro F1: 0.6960 | Acc: 0.7680
+
+results appended to results.csv, misclassified samples exported to outputs/.
