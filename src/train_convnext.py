@@ -60,6 +60,17 @@ from metrics import evaluate, summarise, log_result, SPECIES
 #     ])
 #     return train_tf, val_tf
 
+# dont use w cutmix
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2.0):
+        super().__init__()
+        self.gamma = gamma
+
+    def forward(self, logits, target):
+        logp = torch.log_softmax(logits, dim=1)
+        ce = nn.functional.nll_loss(logp, target, reduction="none")
+        p_correct = torch.exp(-ce)
+        return ((1 - p_correct) ** self.gamma * ce).mean()
 
 # model
 def build_convnext_tiny(num_classes=9, freeze_backbone=True):
@@ -119,6 +130,8 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--weighted_loss", action="store_true", help="Use class-weighted cross-entropy")
     parser.add_argument("--cutmix", action="store_true", help="Apply CutMix to training batches")
+    parser.add_argument("--focal", action="store_true", help="Use focal loss (gamma=2), no class weights")
+    parser.add_argument("--gamma", type=float, default=2.0)
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -146,6 +159,9 @@ def main():
         class_weights = torch.tensor(weights, dtype=torch.float).to(device)
         criterion = nn.CrossEntropyLoss(weight=class_weights)
         print("Using Class-Weighted Cross-Entropy Loss")
+    elif args.focal:
+        criterion = FocalLoss(gamma = args.gamma)
+        print(f"Using Focal Loss (gamma = {args.gamma})")
     else:
         criterion = nn.CrossEntropyLoss()
         print("Using Standard Cross-Entropy Loss")
@@ -184,8 +200,12 @@ def main():
     def to_summary(m):
         return {k: (float(m[k]), 0.0) for k in KEYS}
 
-    model_tag = f"convnext_tiny_{'weighted' if args.weighted_loss else 'ce'}{'_cutmix' if args.cutmix else ''}"
-    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size, "epochs": args.epochs, "seed_set": 42}
+    loss_name = "focal" if args.focal else ("weighted" if args.weighted_loss else "ce")
+    model_tag = f"convnext_tiny_{loss_name}{'_cutmix' if args.cutmix else ''}"
+    params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size,
+              "epochs": args.epochs, "seed_set": 42}
+    if args.focal:
+        params["gamma"] = args.gamma
 
     log_result(model_tag + "_best", args.scheme, params, to_summary(best_results))
     log_result(model_tag + "_final", args.scheme, params, to_summary(val_metrics))

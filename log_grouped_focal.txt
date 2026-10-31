@@ -1,0 +1,23 @@
+Using device: cuda
+Scheme: grouped | Fold: 0 | Train: 10820 | Val: 2454
+Using Focal Loss (gamma = 2.0)
+Downloading: "https://download.pytorch.org/models/convnext_tiny-983f1562.pth" to /root/.cache/torch/hub/checkpoints/convnext_tiny-983f1562.pth
+  0%|          | 0.00/109M [00:00<?, ?B/s] 16%|█▌        | 17.4M/109M [00:00<00:00, 182MB/s] 36%|███▌      | 39.4M/109M [00:00<00:00, 211MB/s] 58%|█████▊    | 62.8M/109M [00:00<00:00, 226MB/s] 78%|███████▊  | 85.0M/109M [00:00<00:00, 229MB/s] 98%|█████████▊| 107M/109M [00:00<00:00, 213MB/s] 100%|██████████| 109M/109M [00:00<00:00, 212MB/s]
+Epoch 01/10 | Loss: 0.4249 | Macro F1: 0.6219 | Acc: 0.7298
+Epoch 02/10 | Loss: 0.1783 | Macro F1: 0.6812 | Acc: 0.8032
+Epoch 03/10 | Loss: 0.1334 | Macro F1: 0.7016 | Acc: 0.7926
+Epoch 04/10 | Loss: 0.1065 | Macro F1: 0.7095 | Acc: 0.7979
+Epoch 05/10 | Loss: 0.0904 | Macro F1: 0.6878 | Acc: 0.7742
+Epoch 06/10 | Loss: 0.0792 | Macro F1: 0.6752 | Acc: 0.7730
+Epoch 07/10 | Loss: 0.0659 | Macro F1: 0.7152 | Acc: 0.7938
+Epoch 08/10 | Loss: 0.0617 | Macro F1: 0.7242 | Acc: 0.8203
+Epoch 09/10 | Loss: 0.0526 | Macro F1: 0.7155 | Acc: 0.8077
+Epoch 10/10 | Loss: 0.0501 | Macro F1: 0.7179 | Acc: 0.8028
+
+results appended to results.csv, misclassified samples exported to outputs/.
+Using device: cuda
+Scheme: grouped | Fold: 1 | Train: 10526 | Val: 2748
+Using Focal Loss (gamma = 2.0)
+Epoch 01/10 | Loss: 0.4748 | Macro F1: 0.7403 | Acc: 0.7835
+Epoch 02/10 | Loss: 0.2090 | Macro F1: 0.7831 | Acc: 0.8133
+Epoch 03/10 | Loss: 0.1512 | Macro F1: 0.7995 | Acc: 0.8337
