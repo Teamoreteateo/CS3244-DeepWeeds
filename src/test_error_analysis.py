@@ -62,9 +62,12 @@ def main(args):
     confidence = np.asarray(confidences)
     metrics = evaluate(y_true, y_pred)
 
-    output_dir = ROOT / "outputs" / "test_evaluation"
-    output_dir.mkdir(parents=True, exist_ok=True)
     tag = f"{args.arch}_{checkpoint['mode']}_test"
+    model_tag = f"{checkpoint['scheme']}_fold{checkpoint['fold']}"
+    test_output_dir = ROOT / "outputs" / "test_evaluation" / model_tag
+    error_output_dir = ROOT / "outputs" / "error_analysis" / model_tag
+    test_output_dir.mkdir(parents=True, exist_ok=True)
+    error_output_dir.mkdir(parents=True, exist_ok=True)
 
     lookup = test_df.set_index("Filename")
     results = pd.DataFrame(
@@ -79,25 +82,25 @@ def main(args):
     errors = results[results["true"] != results["pred"]].sort_values(
         "confidence", ascending=False
     )
-    results.to_csv(output_dir / f"predictions_{tag}.csv", index=False)
-    errors.to_csv(output_dir / f"misclassified_{tag}.csv", index=False)
+    results.to_csv(test_output_dir / f"predictions_{tag}.csv", index=False)
+    errors.to_csv(error_output_dir / f"misclassified_{tag}.csv", index=False)
 
     pd.DataFrame(metrics["cm"], index=SPECIES, columns=SPECIES).to_csv(
-        output_dir / f"cm_{tag}.csv"
+        test_output_dir / f"cm_{tag}.csv"
     )
     pd.DataFrame(metrics["cm_norm"], index=SPECIES, columns=SPECIES).to_csv(
-        output_dir / f"cm_norm_{tag}.csv"
+        test_output_dir / f"cm_norm_{tag}.csv"
     )
     per_class = pd.DataFrame(metrics["per_class"]).T
     per_class = per_class.loc[[str(index) for index in range(len(SPECIES))]]
     per_class.index = SPECIES
-    per_class.to_csv(output_dir / f"per_class_{tag}.csv")
+    per_class.to_csv(test_output_dir / f"per_class_{tag}.csv")
 
     by_session = results.assign(wrong=results["true"] != results["pred"])
     by_session = by_session.groupby("session")["wrong"].agg(["sum", "count"])
     by_session["rate"] = by_session["sum"] / by_session["count"]
     by_session.sort_values("rate", ascending=False).to_csv(
-        output_dir / f"by_session_{tag}.csv"
+        error_output_dir / f"by_session_{tag}.csv"
     )
 
     scalar_metrics = {
@@ -106,7 +109,7 @@ def main(args):
         if key not in ("cm", "cm_norm", "per_class")
     }
     pd.Series(scalar_metrics, name="value").to_csv(
-        output_dir / f"metrics_{tag}.csv", header=True
+        test_output_dir / f"metrics_{tag}.csv", header=True
     )
 
     print(
@@ -118,7 +121,8 @@ def main(args):
         f"acc={metrics['accuracy']:.4f}  "
         f"weed->neg={metrics['weed_to_negative_rate']:.4f}"
     )
-    print(f"written to {output_dir}")
+    print(f"test results written to {test_output_dir}")
+    print(f"error analysis written to {error_output_dir}")
 
 
 if __name__ == "__main__":

@@ -90,7 +90,7 @@ def main(a):
         if not ax.has_data():
             ax.axis("off")
 
-    out = ROOT / "outputs" / "error_analysis"
+    out = Path(a.output_dir) if a.output_dir else ROOT / "outputs" / "error_analysis"
     out.mkdir(parents=True, exist_ok=True)
     p = out / f"gradcam_{Path(a.errors).stem}.png"
     plt.tight_layout()
@@ -104,4 +104,5 @@ if __name__ == "__main__":
     p.add_argument("--errors", required=True)
     p.add_argument("--arch", default="resnet50", choices=("resnet18", "resnet50"))
     p.add_argument("--n", type=int, default=16)
+    p.add_argument("--output-dir", default=None)
     main(p.parse_args())
