@@ -15,7 +15,7 @@ from torchvision import transforms
 from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 
 from data import load_folds, ROOT, IMG_DIR
-from data_pipeline import DeepWeedsDataset, make_transforms, apply_cutmix
+from data_pipeline import DeepWeedsDataset, make_transforms, apply_cutmix, RandomRotate90, MEAN, STD
 from metrics import evaluate, summarise, log_result, SPECIES
 
 
@@ -59,6 +59,28 @@ from metrics import evaluate, summarise, log_result, SPECIES
 #                              std=[0.229, 0.224, 0.225]),
 #     ])
 #     return train_tf, val_tf
+
+class RandomChannelGain:
+    """Mimics white-balance / colour-cast shifts by scaling R, G, B separately."""
+    def __init__(self, low=0.7, high=1.3):
+        self.low, self.high = low, high
+    def __call__(self, x):                       # x: float tensor in [0, 1], 3xHxW
+        g = torch.empty(3, 1, 1).uniform_(self.low, self.high)
+        return (x * g).clamp(0, 1)
+
+def make_colour_aug_transform():
+    return transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.RandomCrop(224),
+        RandomRotate90(),
+        transforms.RandomHorizontalFlip(0.5),
+        transforms.RandomVerticalFlip(0.5),
+        transforms.ColorJitter(brightness=(0.4, 1.3), contrast=0.4, saturation=0.5, hue=0.1),
+        transforms.RandomGrayscale(p=0.1),
+        transforms.ToTensor(),
+        RandomChannelGain(0.7, 1.3),
+        transforms.Normalize(MEAN, STD),
+    ])
 
 # dont use w cutmix
 class FocalLoss(nn.Module):
@@ -132,6 +154,7 @@ def main():
     parser.add_argument("--cutmix", action="store_true", help="Apply CutMix to training batches")
     parser.add_argument("--focal", action="store_true", help="Use focal loss (gamma=2), no class weights")
     parser.add_argument("--gamma", type=float, default=2.0)
+    parser.add_argument("--colour_aug", action="store_true")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -165,6 +188,9 @@ def main():
     else:
         criterion = nn.CrossEntropyLoss()
         print("Using Standard Cross-Entropy Loss")
+
+    if args.colour_aug:
+        tr_loader.dataset.transform = make_colour_aug_transform()
 
     model = build_convnext_tiny(num_classes=9).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-2)
@@ -201,11 +227,14 @@ def main():
         return {k: (float(m[k]), 0.0) for k in KEYS}
 
     loss_name = "focal" if args.focal else ("weighted" if args.weighted_loss else "ce")
-    model_tag = f"convnext_tiny_{loss_name}{'_cutmix' if args.cutmix else ''}"
+    lr_tag = "" if args.lr == 1e-4 else f"_lr{args.lr:g}"
+    model_tag = f"convnext_tiny_{loss_name}{'_cutmix' if args.cutmix else ''}{'_colour' if args.colour_aug else ''}{lr_tag}"
     params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size,
               "epochs": args.epochs, "seed_set": 42}
     if args.focal:
         params["gamma"] = args.gamma
+    if args.colour_aug:
+        params["colour_aug"] = args.colour_aug
 
     log_result(model_tag + "_best", args.scheme, params, to_summary(best_results))
     log_result(model_tag + "_final", args.scheme, params, to_summary(val_metrics))
