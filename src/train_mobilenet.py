@@ -72,6 +72,7 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--fold", type=int, default=0)
+    parser.add_argument("--scheme", choices=["grouped", "random"], default="grouped")
     parser.add_argument("--no-augment", action="store_true")
     parser.add_argument(
         "--smoke-test",
@@ -89,7 +90,7 @@ def main():
 
     train_loader, val_loader, _, classes = get_dataloaders(
         val_fold=args.fold,
-        split="grouped",
+        split=args.scheme,
         batch_size=args.batch_size,
         augment=not args.no_augment,
         weighted_sampling=False,
@@ -154,7 +155,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     checkpoint_path = output_dir / (
-        f"mobilenetv3_finetune_grouped_fold{args.fold}"
+        f"mobilenetv3_finetune_{args.scheme}_fold{args.fold}"
         f"{'_noaug' if args.no_augment else '_aug'}.pt"
     )
 
@@ -177,7 +178,7 @@ def main():
 
     log_result(
         model="mobilenetv3_large_finetune",
-        scheme="grouped",
+        scheme=args.scheme,
         params={
             "arch": "mobilenet_v3_large",
             "epochs": args.epochs,
