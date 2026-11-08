@@ -75,7 +75,7 @@ class DeepWeedsDataset(Dataset):
             image = img.convert('RGB')
         if self.transform is not None:
             image = self.transform(image)
-        return image, int(row['Label'])
+        return image, int(row['Label']), str(row['Filename'])
 
 
 def get_dataloaders(
