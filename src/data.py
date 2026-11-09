@@ -64,3 +64,6 @@ def content_hashes(df):
 
 def load_folds():
     return pd.read_csv(SPLITS / "folds.csv", dtype={"session": str, "date": str})
+
+def load_folds_paper():
+    return pd.read_csv(SPLITS / "folds_paper.csv", dtype={"session": str})
