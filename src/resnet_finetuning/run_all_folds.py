@@ -1,15 +1,14 @@
-"""Run five-fold ResNet-50 fine-tuning for both split schemes.
+"""Run five-fold ResNet-50 fine-tuning for each split scheme.
 
-Run from the repository root:
+    python src/resnet_finetuning/run_all_folds.py --schemes paper
+    python src/resnet_finetuning/run_all_folds.py --schemes random grouped
 
-    .venv\\Scripts\\python.exe src\\resnet_finetuning\\run_all_folds.py
-
-The script selects the best epoch in each fold by validation macro-F1, then
-selects the best fold checkpoint across both schemes for convenient inspection.
-The held-out test set is intentionally not evaluated.
+Best epoch per fold is selected by validation macro-F1. The held-out test set
+is not evaluated.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import sys
@@ -22,12 +21,8 @@ SRC_DIR = SCRIPT_DIR.parent
 ROOT = SRC_DIR.parent
 sys.path.insert(0, str(SRC_DIR))
 
-from data import load_folds  # noqa: E402
-from train_resnet import (  # noqa: E402
-    SEED,
-    train_fold,
-    seed_everything,
-)
+from data import load_folds, load_folds_paper  # noqa: E402
+from train_resnet import SEED, train_fold, seed_everything  # noqa: E402
 from metrics import log_result  # noqa: E402
 import torch  # noqa: E402
 from argparse import Namespace  # noqa: E402
@@ -48,6 +43,11 @@ CONFIG = {
 
 
 def main() -> None:
+    p = argparse.ArgumentParser()
+    p.add_argument("--schemes", nargs="+", default=["random", "grouped"],
+                   choices=["random", "grouped", "paper"])
+    cli = p.parse_args()
+
     if not torch.cuda.is_available():
         raise RuntimeError(
             "CUDA is required for this full five-fold ResNet-50 run. "
@@ -56,28 +56,38 @@ def main() -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
-    folds = load_folds()
-    test_df = folds.loc[folds["is_test"]].copy()
-    pool = folds.loc[~folds["is_test"]].copy()
     device = torch.device("cuda")
-    args = Namespace(**CONFIG, scheme="grouped", eval_test=False)
+    args = Namespace(**CONFIG, scheme=cli.schemes[0], eval_test=False)
     results: list[dict] = []
 
-    for scheme in ("random", "grouped"):
-        fold_column = f"fold_{scheme}"
+    for scheme in cli.schemes:
         args.scheme = scheme
+        paper = scheme == "paper"
+        if paper:
+            pool = load_folds_paper()
+            test_df = None
+        else:
+            folds = load_folds()
+            test_df = folds.loc[folds["is_test"]].copy()
+            pool = folds.loc[~folds["is_test"]].copy()
+            fold_column = f"fold_{scheme}"
+
         for fold in range(5):
             seed_everything(SEED)
-            train_df = pool.loc[pool[fold_column] != fold].copy()
-            validation_df = pool.loc[pool[fold_column] == fold].copy()
+            if paper:
+                col = f"paper_fold{fold}"
+                train_df      = pool.loc[pool[col] == "train"].copy()
+                validation_df = pool.loc[pool[col] == "val"].copy()
+                test_df       = pool.loc[pool[col] == "test"].copy()
+            else:
+                train_df      = pool.loc[pool[fold_column] != fold].copy()
+                validation_df = pool.loc[pool[fold_column] == fold].copy()
+
+            print(f"[{scheme} fold {fold}] train={len(train_df)} "
+                  f"val={len(validation_df)}")
             validation, _ = train_fold(
-                CONFIG["mode"],
-                train_df,
-                validation_df,
-                test_df,
-                args,
-                device,
-                fold,
+                CONFIG["mode"], train_df, validation_df, test_df,
+                args, device, fold,
             )
             source = ROOT / "outputs" / "checkpoints" / (
                 f"{CONFIG['arch']}_{CONFIG['mode']}_{scheme}_fold{fold}.pt"
@@ -92,43 +102,28 @@ def main() -> None:
             })
 
     results_df = pd.DataFrame(results)
-    results_df.to_csv(OUTPUT_DIR / "fold_results.csv", index=False)
+    out_csv = OUTPUT_DIR / "fold_results.csv"
+    if out_csv.exists():
+        results_df = pd.concat([pd.read_csv(out_csv), results_df])
+    results_df.to_csv(out_csv, index=False)
+
     summaries = {}
     for scheme, group in results_df.groupby("scheme"):
         summaries[scheme] = {
-            metric: (
-                float(group[metric].mean()),
-                float(group[metric].std(ddof=0)),
-            )
-            for metric in (
-                "macro_f1",
-                "weighted_f1",
-                "accuracy",
-                "weed_to_negative_rate",
-            )
+            metric: (float(group[metric].mean()),
+                     float(group[metric].std(ddof=0)))
+            for metric in ("macro_f1", "weighted_f1", "accuracy",
+                           "weed_to_negative_rate")
         }
-        log_result(
-            "resnet50_finetune",
-            scheme,
-            CONFIG | {"folds": list(range(5))},
-            summaries[scheme],
-        )
-    best = results_df.loc[results_df["macro_f1"].idxmax()]
-    best_source = ROOT / best["checkpoint"]
-    best_destination = OUTPUT_DIR / "best_model.pt"
-    shutil.copy2(best_source, best_destination)
+        log_result("resnet50_finetune", scheme,
+                   CONFIG | {"folds": list(range(5))}, summaries[scheme])
+
     report = {
         "hyperparameters": CONFIG,
         "seed": SEED,
         "selection_metric": "validation macro_f1",
+        "schemes_run": cli.schemes,
         "summaries": summaries,
-        "best_fold": {
-            "scheme": best["scheme"],
-            "fold": int(best["fold"]),
-            "macro_f1": float(best["macro_f1"]),
-            "accuracy": float(best["accuracy"]),
-            "checkpoint": str(best_destination.relative_to(ROOT)),
-        },
         "test_evaluated": False,
     }
     (OUTPUT_DIR / "summary.json").write_text(json.dumps(report, indent=2))

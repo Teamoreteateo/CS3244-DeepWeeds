@@ -23,7 +23,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision.models import (ResNet18_Weights, ResNet50_Weights, resnet18, resnet50)
 
-from data import IMG_DIR, ROOT, load_folds
+from data import IMG_DIR, ROOT, load_folds, load_folds_paper
 from metrics import evaluate, log_result, summarise, SPECIES
 from data_pipeline import DeepWeedsDataset, make_transforms
 
@@ -200,6 +200,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--weighted-loss", action="store_true")
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto")
+    parser.add_argument("--scheme", choices=("random", "grouped", "paper"), default="grouped")
     return parser.parse_args()
 
 
@@ -226,16 +227,29 @@ def main() -> None:
         device = torch.device("cpu")
     print(f"mode={args.mode} scheme={args.scheme} device={device}")
 
-    folds = load_folds()
-    test_df = folds.loc[folds["is_test"]].copy()
-    pool = folds.loc[~folds["is_test"]].copy()
+    paper = args.scheme == "paper"
+    if paper:
+        folds = load_folds_paper()
+        test_df = None                      # per-fold, assigned in the loop
+        pool = folds
+    else:
+        folds = load_folds()
+        test_df = folds.loc[folds["is_test"]].copy()
+        pool = folds.loc[~folds["is_test"]].copy()
+        fold_column = f"fold_{args.scheme}"
+
     selected_folds = [args.fold] if args.fold is not None else list(range(N_FOLDS))
     validation_results, test_results = [], []
-    fold_column = f"fold_{args.scheme}"
 
     for fold in selected_folds:
-        train_df = pool.loc[pool[fold_column] != fold].copy()
-        validation_df = pool.loc[pool[fold_column] == fold].copy()
+        if paper:
+            col = f"paper_fold{fold}"
+            train_df      = pool.loc[pool[col] == "train"].copy()
+            validation_df = pool.loc[pool[col] == "val"].copy()
+            test_df       = pool.loc[pool[col] == "test"].copy()
+        else:
+            train_df      = pool.loc[pool[fold_column] != fold].copy()
+            validation_df = pool.loc[pool[fold_column] == fold].copy()
         validation, test = train_fold(
             args.mode, train_df, validation_df, test_df, args, device, fold
         )

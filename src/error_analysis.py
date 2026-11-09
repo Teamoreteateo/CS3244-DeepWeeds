@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18, resnet50
 
-from data import IMG_DIR, ROOT, load_folds
+from data import IMG_DIR, ROOT, load_folds, load_folds_paper
 from data_pipeline import DeepWeedsDataset, make_transforms
 from metrics import SPECIES, evaluate
 
@@ -28,9 +28,13 @@ def main(a):
     model.load_state_dict(ck["state_dict"])
     model.eval().to(dev)
 
-    f = load_folds()
-    pool = f[~f["is_test"]]
-    val_df = pool[pool[f"fold_{scheme}"] == fold].copy()
+    if scheme == "paper":
+        f = load_folds_paper()
+        val_df = f[f[f"paper_fold{fold}"] == "val"].copy()
+    else:
+        f = load_folds()
+        pool = f[~f["is_test"]]
+        val_df = pool[pool[f"fold_{scheme}"] == fold].copy()
     print(f"validation images: {len(val_df)}")
 
     ds = DeepWeedsDataset(val_df, IMG_DIR, make_transforms(augment=False), SPECIES)
