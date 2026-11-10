@@ -37,16 +37,11 @@ def summarise(fold_results):
                 float(np.std([r[k] for r in fold_results]))) for k in keys}
 
 
-RESULTS = Path(__file__).resolve().parent.parent / "results.csv"
+RESULTS = Path(__file__).resolve().parent.parent / "results2.csv"
 
 
 def log_result(model, scheme, params, summary, path=None):
     path = RESULTS if path is None else path
-    if os.path.exists(path) and os.path.getsize(path) > 0:
-        with open(path, 'rb+') as f:
-            f.seek(-1, 2)
-            if f.read(1) != b'\n':
-                f.write(b'\n')
     row = {"timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
            "model": model, "split_scheme": scheme,
            "params": json.dumps(params), "seed": 42}
