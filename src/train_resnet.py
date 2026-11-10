@@ -191,7 +191,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--arch", choices=("resnet18", "resnet50"), default="resnet50")
     parser.add_argument("--eval-test", action="store_true",
                     help="FINAL evaluation only. Leave off during development.")
-    parser.add_argument("--scheme", choices=("random", "grouped"), default="grouped")
     parser.add_argument("--fold", type=int, choices=range(N_FOLDS), default=None)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
