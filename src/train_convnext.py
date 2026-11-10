@@ -14,7 +14,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 
-from data import load_folds, ROOT, IMG_DIR
+from data import load_folds, load_folds_paper, ROOT, IMG_DIR
 from data_pipeline import DeepWeedsDataset, make_transforms, apply_cutmix, RandomRotate90, MEAN, STD
 from metrics import evaluate, summarise, log_result, SPECIES
 
@@ -113,7 +113,8 @@ def build_convnext_tiny(num_classes=9, freeze_backbone=True):
 def train_one_epoch(model, loader, criterion, optimizer, device, use_cutmix = False):
     model.train()
     total_loss = 0.0
-    for images, labels in loader:
+    for batch in loader:
+        images, labels = batch[0], batch[1]
         images, labels = images.to(device), labels.to(device)
         if use_cutmix:
             images, labels = apply_cutmix(images, labels, num_classes=9, probability=0.5)        
@@ -130,7 +131,8 @@ def train_one_epoch(model, loader, criterion, optimizer, device, use_cutmix = Fa
 def evaluate_model(model, loader, device):
     model.eval()
     all_preds, all_trues = [], []
-    for images, labels in loader:
+    for batch in loader:
+        images, labels = batch[0], batch[1]
         images = images.to(device)
         outputs = model(images)
         preds = torch.argmax(outputs, dim=1).cpu().numpy()
@@ -143,10 +145,11 @@ def evaluate_model(model, loader, device):
 
 # exc
 def main():
-    random.seed(42); np.random.seed(42); torch.manual_seed(42)
+    # seed_set = 42
+    # random.seed(seed_set); np.random.seed(seed_set); torch.manual_seed(seed_set)
     parser = argparse.ArgumentParser()
     parser.add_argument("--fold", type=int, default=0, help="Fold index (0-4)")
-    parser.add_argument("--scheme", type=str, default="grouped", choices=["random", "grouped"])
+    parser.add_argument("--scheme", type=str, default="paper", choices=["paper"])
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-4)
@@ -155,25 +158,25 @@ def main():
     parser.add_argument("--focal", action="store_true", help="Use focal loss (gamma=2), no class weights")
     parser.add_argument("--gamma", type=float, default=2.0)
     parser.add_argument("--colour_aug", action="store_true")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # load splits
-    df = load_folds()
-    pool = df[~df["is_test"]].reset_index(drop=True)
-    col = f"fold_{args.scheme}"
-
-    tr_df = pool[pool[col] != args.fold]
-    va_df = pool[pool[col] == args.fold]
+    df = load_folds_paper()
+    col = f"paper_fold{args.fold}"
+    tr_df = df[df[col] == "train"]
+    va_df = df[df[col] == "val"]
     print(f"Scheme: {args.scheme} | Fold: {args.fold} | Train: {len(tr_df)} | Val: {len(va_df)}")
 
     tr_ds = DeepWeedsDataset(tr_df, IMG_DIR, make_transforms(True), SPECIES)
     va_ds = DeepWeedsDataset(va_df, IMG_DIR, make_transforms(False), SPECIES)
 
-    tr_loader = DataLoader(tr_ds, batch_size=args.batch_size, shuffle=True, num_workers=2)
-    va_loader = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=2)
+    tr_loader = DataLoader(tr_ds, batch_size=args.batch_size, shuffle=True, num_workers=12)
+    va_loader = DataLoader(va_ds, batch_size=args.batch_size, shuffle=False, num_workers=12)
 
     # class-imbalance ablation support
     if args.weighted_loss:
@@ -196,6 +199,7 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-2)
 
     best_macro_f1 = 0.0
+    best_epoch = 0
     best_results = None
     misclassifications = None
     val_files = va_df["Filename"].values             # Extract filenames in order
@@ -210,6 +214,7 @@ def main():
         if val_metrics["macro_f1"] > best_macro_f1:
             best_macro_f1 = val_metrics["macro_f1"]
             best_results = val_metrics
+            best_epoch = epoch
 
             # extract misclassified instances
             wrong_mask = preds != trues
@@ -228,9 +233,11 @@ def main():
 
     loss_name = "focal" if args.focal else ("weighted" if args.weighted_loss else "ce")
     lr_tag = "" if args.lr == 1e-4 else f"_lr{args.lr:g}"
-    model_tag = f"convnext_tiny_{loss_name}{'_cutmix' if args.cutmix else ''}{'_colour' if args.colour_aug else ''}{lr_tag}"
+    seed_tag = "" if args.seed == 42 else f"_s{args.seed}"
+    ep_tag = "" if args.epochs == 20 else f"_ep{args.epochs}"
+    model_tag = f"convnext_tiny_{loss_name}{'_cutmix' if args.cutmix else ''}{'_colour' if args.colour_aug else ''}{lr_tag}{seed_tag}{ep_tag}_val"
     params = {"fold": args.fold, "lr": args.lr, "batch_size": args.batch_size,
-              "epochs": args.epochs, "seed_set": 42}
+              "epochs": args.epochs, "seed_set": args.seed, "best_epoch": best_epoch}
     if args.focal:
         params["gamma"] = args.gamma
     if args.colour_aug:
