@@ -1,5 +1,6 @@
 data/
 outputs/
+outputs_old/
 figures/
 *.npy
 *.npz

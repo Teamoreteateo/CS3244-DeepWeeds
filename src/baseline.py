@@ -19,8 +19,8 @@ def run(scheme):
         clf = DummyClassifier(strategy="most_frequent").fit(tr[["Label"]], tr["Label"])
         res.append(evaluate(va["Label"], clf.predict(va[["Label"]])))
     s = summarise(res)
-    print(scheme, s)
-    log_result("majority_class", scheme, {"strategy": "most_frequent"}, s)
+    print("paper", s)
+    log_result("majority_class", "paper", {"strategy": "most_frequent"}, s)
 
 
 if __name__ == "__main__":
