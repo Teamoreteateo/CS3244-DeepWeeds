@@ -40,7 +40,7 @@ Validation = mean over the five validation folds unless noted.
 | ResNet-50, frozen + logistic regression | 0.755 ± 0.005 | 81.1% | `results2.csv` → `resnet50_frozen_logreg` |
 | ResNet-18 from scratch (fold 0 only) | 0.812 | 85.4% | `results2.csv` → `resnet18_scratch` |
 | ResNet-50, fine-tuned | 0.952 ± 0.002 | 96.2% | `results2.csv` → `resnet50_finetune` |
-| ConvNeXt-Tiny, fine-tuned | 0.932 | 94.9% | `results2.csv` → `convnext_tiny_ce_val_best` |
+| ConvNeXt-Tiny, fine-tuned | 0.924 | 94.2% | `results2.csv` → `convnext_tiny_ce_val_best` |
 | MobileNetV3-Large, fine-tuned (LR 1e-4) | 0.953 | 96.3% | `results_mobilenet_paper.csv` |
 | ViT-B/16 pretrained, fine-tuned (fold 0 only) | 0.927 | 93.9% | `ViT_validation_comparison.csv` |
 | ViT from scratch (fold 0 only) | 0.598 | 62.5% | `ViT_validation_comparison.csv` |
