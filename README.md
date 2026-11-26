@@ -84,7 +84,8 @@ results.csv                runs on random / grouped splits (+ baselines)
 results2.csv               runs on paper splits
 results_mobilenet_paper.csv  MobileNet per-fold validation (3 LRs) and test results
 ViT_validation_comparison.csv  ViT scratch vs pretrained, paper fold 0 validation
-make_paper_folds.py        builds splits/folds_paper.csv from the official subset CSVs
+scripts/                   make_paper_folds.py (builds splits/folds_paper.csv), pool_errors.py / pool_perclass.py
+logs/                      raw training logs
 ```
 Note: results.csv is only kept for documentation. It contains results from old runs on splits created by us that we did not proceed with and use. All comparisons and analyses done in this project uses results2.csv on the paper's splits.
 
