@@ -142,6 +142,15 @@ python image_stats.py
 
 All runs use seed 42. Results are appended to `results.csv` / `results2.csv` via `metrics.log_result`.
 
+**Vision transformer Model Checkpoints**
+
+The trained ViT model checkpoints are required to run notebooks/vit_paper_fold_validation_error_analysis.ipynb.
+The training notebook saves the best-performing checkpoints to outputs/vit/:
+vit_scratch_best.pt — Scratch-trained ViT model
+vit_hf_vit_base_patch16_224_in21k_finetuned_best.pt — Fine-tuned Hugging Face ViT model
+
+Before running the validation error-analysis notebook, copy both .pt files from outputs/vit/ into the checkpoints/ directory at the repository root.
+
 ## References
 
 Olsen, A., Konovalov, D. A., Philippa, B., Ridd, P., Wood, J. C., Johns, J., Banks, W., Girgenti, B.,
