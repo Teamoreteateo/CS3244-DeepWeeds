@@ -130,6 +130,7 @@ python error_analysis.py --ckpt <checkpoint.pt> --arch resnet50
 python gradcam.py --ckpt <checkpoint.pt> --errors <misclassified_csv> --arch resnet50
 
 # Image brightness/contrast vs errors
+python compare_ce_cutmix.py
 python image_stats.py
 ```
 
