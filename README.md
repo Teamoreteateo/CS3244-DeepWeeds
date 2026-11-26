@@ -23,7 +23,7 @@ model), ConvNeXt-Tiny, MobileNetV3-Large and a Vision Transformer (ViT-B/16 and 
   Every image appears in exactly one test subset.
 - **Primary metric:** macro-F1 (all nine classes weighted equally). Negative is ~52% of the data, so an
   always-Negative model scores 52% accuracy but only 0.076 macro-F1.
-- **Also reported:** accuracy, weighted-F1 and the weed→Negative rate (share of weed images predicted
+- **Other metrics:** accuracy, weighted-F1 and the weed→Negative rate (share of weed images predicted
   as Negative, i.e. weeds a sprayer would miss). All metrics come from `src/metrics.py`.
 - **Model selection** uses validation macro-F1 only. The test subsets are used once, for the final model.
 - `splits/folds.csv` holds our earlier random and session-grouped splits (`fold_random`, `fold_grouped`,
@@ -40,7 +40,7 @@ Validation = mean over the five validation folds unless noted.
 | ResNet-50, frozen + logistic regression | 0.755 ± 0.005 | 81.1% | `results2.csv` → `resnet50_frozen_logreg` |
 | ResNet-18 from scratch (fold 0 only) | 0.812 | 85.4% | `results2.csv` → `resnet18_scratch` |
 | ResNet-50, fine-tuned | 0.952 ± 0.002 | 96.2% | `results2.csv` → `resnet50_finetune` |
-| ConvNeXt-Tiny, fine-tuned + CutMix | 0.932 | 94.9% | `results2.csv` → `convnext_tiny_ce_cutmix_val_best` |
+| ConvNeXt-Tiny, fine-tuned | 0.932 | 94.9% | `results2.csv` → `convnext_tiny_ce_val_best` |
 | MobileNetV3-Large, fine-tuned (LR 1e-4) | 0.953 | 96.3% | `results_mobilenet_paper.csv` |
 | ViT-B/16 pretrained, fine-tuned (fold 0 only) | 0.927 | 93.9% | `ViT_validation_comparison.csv` |
 | ViT from scratch (fold 0 only) | 0.598 | 62.5% | `ViT_validation_comparison.csv` |
@@ -123,13 +123,13 @@ python resnet_finetuning/run_all_folds.py --schemes paper         # fine-tuning,
 python train_resnet.py --mode scratch --arch resnet18 --scheme paper --fold 0 --epochs 40
 
 # ConvNeXt-Tiny (one fold per call; repeat for --fold 0..4)
-python train_convnext.py --fold 0 --cutmix --epochs 20
+python train_convnext.py --fold 0 --epochs 20
 
 # Error analysis and Grad-CAM (ResNet checkpoint)
 python error_analysis.py --ckpt <checkpoint.pt> --arch resnet50
 python gradcam.py --ckpt <checkpoint.pt> --errors <misclassified_csv> --arch resnet50
 
-# Image brightness/contrast vs errors (needs outputs/per_image_ce_vs_cutmix.csv from the ConvNeXt analysis)
+# Image brightness/contrast vs errors
 python image_stats.py
 ```
 
@@ -146,10 +146,9 @@ All runs use seed 42. Results are appended to `results.csv` / `results2.csv` via
 |---|---|---|---|---|
 | Init | ImageNet | ImageNet | ImageNet | ImageNet-21k (`google/vit-base-patch16-224-in21k`) |
 | Optimiser | AdamW, wd 1e-4 | AdamW, wd 1e-2 | AdamW, wd 1e-4 | AdamW, cosine schedule |
-| LR | 1e-4 | 1e-4 | 1e-4 (chosen from 5e-5 / 1e-4 / 2e-4) | 2e-5 |
-| Epochs | 20 | 20 (CutMix) | 20 | 5 |
-| Loss | cross-entropy | cross-entropy + CutMix | cross-entropy | cross-entropy |
-| Augmentation | `data_pipeline.make_transforms` | own stronger colour augmentation | `data_pipeline.make_transforms` | `data_pipeline.make_transforms` |
+| LR | 1e-4 | 1e-4 (chosen from 3e-4 / 1e-4 / 3e-5)| 1e-4 (chosen from 5e-5 / 1e-4 / 2e-4) | 2e-5 |
+| Epochs | 20 | 20 | 20 | 5 |
+| Loss | cross-entropy | cross-entropy | cross-entropy | cross-entropy |
 
 Checkpoint = epoch with the highest validation macro-F1.
 
