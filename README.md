@@ -126,6 +126,9 @@ python train_resnet.py --mode scratch --arch resnet18 --scheme paper --fold 0 --
 # ConvNeXt-Tiny (one fold per call; repeat for --fold 0..4)
 python train_convnext.py --fold 0 --epochs 20
 
+# ConvNeXt-Tiny with CutMix
+python train_convnext.py --fold 0 --epochs 20 --cutmix
+
 # Error analysis and Grad-CAM (ResNet checkpoint)
 python error_analysis.py --ckpt <checkpoint.pt> --arch resnet50
 python gradcam.py --ckpt <checkpoint.pt> --errors <misclassified_csv> --arch resnet50
