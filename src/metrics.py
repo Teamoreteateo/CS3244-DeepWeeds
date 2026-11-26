@@ -47,5 +47,11 @@ def log_result(model, scheme, params, summary, path=None):
            "params": json.dumps(params), "seed": 42}
     for k, (m, s) in summary.items():
         row[f"{k}_mean"], row[f"{k}_std"] = m, s
+    # guard: if the file lacks a trailing newline, the new row would merge into the last one
+    if os.path.exists(path) and os.path.getsize(path) > 0:
+        with open(path, "rb+") as f:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":
+                f.write(b"\n")
     pd.DataFrame([row]).to_csv(path, mode="a",
                                header=not os.path.exists(path), index=False)
