@@ -140,28 +140,6 @@ python image_stats.py
 
 All runs use seed 42. Results are appended to `results.csv` / `results2.csv` via `metrics.log_result`.
 
-## Main training settings
-
-| | ResNet-50 | ConvNeXt-Tiny | MobileNetV3-Large | ViT-B/16 (pretrained) |
-|---|---|---|---|---|
-| Init | ImageNet | ImageNet | ImageNet | ImageNet-21k (`google/vit-base-patch16-224-in21k`) |
-| Optimiser | AdamW, wd 1e-4 | AdamW, wd 1e-2 | AdamW, wd 1e-4 | AdamW, cosine schedule |
-| LR | 1e-4 | 1e-4 (chosen from 3e-4 / 1e-4 / 3e-5)| 1e-4 (chosen from 5e-5 / 1e-4 / 2e-4) | 2e-5 |
-| Epochs | 20 | 20 | 20 | 5 |
-| Loss | cross-entropy | cross-entropy | cross-entropy | cross-entropy |
-
-Checkpoint = epoch with the highest validation macro-F1.
-
-## Known limitations
-
-- **Session leakage:** under the official splits, images from the same recording session appear in both
-  training and validation, so scores are likely optimistic for unseen sites or days. Our session-grouped
-  runs (`results.csv`, scheme `grouped`) score substantially lower.
-- **Not fully standardised:** hyperparameters, epochs and augmentation differ between architectures, and
-  some runs (ViT, ResNet-18 scratch) use one fold only.
-- **Close scores:** MobileNetV3 (0.953) and fine-tuned ResNet-50 (0.952 ± 0.002) are within fold-to-fold
-  variation of each other.
-
 ## References
 
 Olsen, A., Konovalov, D. A., Philippa, B., Ridd, P., Wood, J. C., Johns, J., Banks, W., Girgenti, B.,
